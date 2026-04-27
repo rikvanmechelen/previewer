@@ -193,7 +193,9 @@ jobs:
           set -eux
           mkdir -p dist
           cp target/debian/*.deb dist/
-          cp *.AppImage dist/
+          # Only the Previewer AppImage — `linuxdeploy-x86_64.AppImage`
+          # is the build tool, not a release artefact.
+          cp Previewer-*.AppImage dist/
           (cd dist && sha256sum * > SHA256SUMS)
           ls -la dist
 
