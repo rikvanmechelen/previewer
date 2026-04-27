@@ -62,7 +62,14 @@ jobs:
             squashfs-tools \
             zsync \
             dpkg \
-            fakeroot
+            fakeroot \
+            gdk-pixbuf2 \
+            shared-mime-info \
+            adwaita-icon-theme \
+            hicolor-icon-theme \
+            gsettings-desktop-schemas \
+            dconf \
+            gobject-introspection
 
       - uses: actions/checkout@v4
         with:
@@ -129,19 +136,25 @@ jobs:
             https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk.sh
 
-      - name: Defensive — ensure gtk-4.0 module dir exists
-        # linuxdeploy-plugin-gtk hard-fails when /usr/lib/gtk-4.0
-        # doesn't exist (it `cp -r`s the dir). On modern Arch the
-        # gtk4 package may not install this dir if no print backends
-        # are configured. Create it empty so the plugin's copy step
-        # is a no-op rather than an error. GTK4 itself doesn't need
-        # the modules dir at runtime — it's a legacy GTK3 feature.
+      - name: Defensive — ensure GTK plugin's expected dirs exist + log paths
+        # linuxdeploy-plugin-gtk derives a bunch of paths via pkg-config
+        # variables and `cp -r`s the resulting dirs. Any missing source
+        # is a hard fail. Pre-create the most fragile ones empty (they
+        # won't break the resulting AppImage at runtime — GTK4 doesn't
+        # require the legacy modules dir, and the gdk-pixbuf loaders
+        # cache file won't exist either way) and dump the resolved
+        # paths so future failures are easier to diagnose.
         run: |
-          ls -la /usr/lib/gtk-4.0 2>&1 || echo "(gtk-4.0 dir absent — creating)"
+          set -x
           mkdir -p /usr/lib/gtk-4.0
-          # Also pre-create the AppDir destination linuxdeploy-plugin-gtk
-          # writes into, on the off chance the cp is failing on dest.
           mkdir -p AppDir/usr/lib/gtk-4.0
+          # gdk-pixbuf-2.0 loaders dir lives at /usr/lib/gdk-pixbuf-2.0/2.10.0
+          # on Arch; the plugin reads its location from pkg-config.
+          for var in gdk_pixbuf_binary_version gdk_pixbuf_binarydir gdk_pixbuf_moduledir; do
+              echo "$var=$(pkg-config --variable=$var gdk-pixbuf-2.0 2>&1)"
+          done
+          ls -la /usr/lib/gdk-pixbuf-2.0 2>&1 || true
+          ls -la /usr/lib/gtk-4.0 2>&1 || true
 
       - name: Build AppImage
         env:
