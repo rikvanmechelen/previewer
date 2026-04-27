@@ -12,7 +12,7 @@ name: Release
 
 on:
   push:
-    tags: ['v*.*.*']
+    tags: ['v*.*.*', 'v*.*.*-*']
   # Manual fallback so a maintainer can re-run a build for an existing
   # tag (e.g. after fixing CI) without having to delete and re-push.
   workflow_dispatch:
@@ -25,41 +25,51 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
   PDFIUM_DYNAMIC_LIB_PATH: ${{ github.workspace }}/vendor/pdfium/lib
-  # AppImage tooling on ubuntu-24.04 doesn't have libfuse2 by default,
-  # which the AppImage runtime needs to mount itself. Fall back to
-  # extract-and-run so linuxdeploy still functions.
+  # AppImage tooling on container runners can't FUSE-mount itself —
+  # extract-and-run sidesteps that, with a small startup-time cost.
   APPIMAGE_EXTRACT_AND_RUN: "1"
 
 jobs:
   build:
     name: Build .deb + AppImage
     runs-on: ubuntu-24.04
+    # Build inside Arch — Ubuntu 24.04 has glib 2.80; the gnome_50
+    # feature in our gtk4-rs stack needs glib >= 2.87. Arch tracks the
+    # bleeding edge.
+    container:
+      image: archlinux:latest
     permissions:
-      # `softprops/action-gh-release` needs write to upload assets.
-      contents: write
+      contents: write   # needed for action-gh-release upload
 
     steps:
+      - name: Install build deps
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm --needed \
+            base-devel \
+            git \
+            rustup \
+            gtk4 \
+            libadwaita \
+            libheif \
+            x265 \
+            pkgconf \
+            curl \
+            wget \
+            file \
+            desktop-file-utils \
+            librsvg \
+            squashfs-tools \
+            zsync \
+            dpkg \
+            fakeroot
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libgtk-4-dev \
-            libadwaita-1-dev \
-            libheif-dev \
-            libheif-plugin-x265 \
-            pkg-config \
-            curl \
-            ca-certificates \
-            file \
-            desktop-file-utils \
-            librsvg2-dev \
-            zsync
-
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust toolchain
+        run: rustup default stable
 
       - uses: Swatinem/rust-cache@v2
 
@@ -82,8 +92,6 @@ jobs:
         run: cargo install cargo-deb --locked
 
       - name: Build .deb
-        # `--no-strip` lets the workspace's profile.release `strip =
-        # "symbols"` do the work without a redundant pass.
         run: cargo deb -p previewer-app --no-strip --no-build
 
       # ────────────────────── AppImage ──────────────────────
@@ -101,9 +109,8 @@ jobs:
           install -Dm755 target/release/previewer "$APPDIR/usr/bin/previewer"
 
           # Place libpdfium.so directly under usr/lib/ so linuxdeploy's
-          # default LD_LIBRARY_PATH ($APPDIR/usr/lib) catches it via the
-          # bare-name fallback in `resolve_pdfium_path`. No env-var
-          # gymnastics needed at runtime.
+          # default LD_LIBRARY_PATH ($APPDIR/usr/lib) catches it via
+          # the bare-name fallback in `resolve_pdfium_path`.
           install -Dm644 vendor/pdfium/lib/libpdfium.so "$APPDIR/usr/lib/libpdfium.so"
 
           install -Dm644 data/org.moma.Previewer.desktop \
@@ -124,7 +131,6 @@ jobs:
 
       - name: Build AppImage
         env:
-          # Surfaces in the AppImage filename: Previewer-<VERSION>-x86_64.AppImage.
           VERSION: ${{ github.event.inputs.tag || github.ref_name }}
           DEPLOY_GTK_VERSION: "4"
         run: |
