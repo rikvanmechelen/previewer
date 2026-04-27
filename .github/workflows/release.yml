@@ -133,6 +133,11 @@ jobs:
         env:
           VERSION: ${{ github.event.inputs.tag || github.ref_name }}
           DEPLOY_GTK_VERSION: "4"
+          # linuxdeploy ships an older `strip` that doesn't understand
+          # the SHT_RELR (`.relr.dyn`) ELF section the bundled Arch
+          # libraries use. Skip stripping entirely — the AppImage is
+          # ~30% larger but actually builds.
+          NO_STRIP: "true"
         run: |
           set -eux
           ./linuxdeploy-x86_64.AppImage \
