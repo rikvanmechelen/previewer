@@ -1,0 +1,93 @@
+# Maintainer: Previewer maintainers <noreply@moma.org>
+#
+# Build a Previewer package from the worktree this PKGBUILD lives in
+# (no git or tarball required — `prepare()` rsyncs the source into
+# $srcdir):
+#
+#   cd packaging/arch
+#   makepkg -si
+#
+# For a published release, replace the empty `source=()` with a tagged
+# tarball URL and drop the rsync step in `prepare()`.
+
+pkgname=previewer
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Native GNOME image and PDF viewer with annotation and signing"
+arch=('x86_64' 'aarch64')
+url="https://github.com/rikvanmechelen/previewer"
+license=('GPL3')
+depends=('gtk4' 'libadwaita' 'libheif')
+makedepends=('rust' 'cargo' 'curl' 'rsync')
+# bblanchon/pdfium-binaries release we vendor — bump in lock-step with
+# `scripts/fetch-pdfium.sh`.
+_pdfium_release="chromium/7543"
+options=('!lto')  # Cargo's profile already sets thin LTO; let it drive.
+
+# Empty source — `prepare()` populates `$srcdir/$pkgname-src` from the
+# worktree this PKGBUILD lives in. Avoids needing a git repo or a
+# release tarball for local builds.
+source=()
+sha256sums=()
+
+prepare() {
+    local worktree
+    worktree="$(realpath "$startdir/../..")"
+    local stage="$srcdir/${pkgname}-src"
+
+    rm -rf "$stage"
+    mkdir -p "$stage"
+
+    # Sync the worktree into srcdir, skipping anything we don't need
+    # in the build (heavy or generated). `--exclude` is rsync-style.
+    rsync -a \
+        --exclude='target/' \
+        --exclude='.git/' \
+        --exclude='*.swp' \
+        --exclude='.DS_Store' \
+        "$worktree/" "$stage/"
+
+    cd "$stage"
+
+    # Vendor pdfium so the build doesn't reach for the network.
+    if [ ! -f "vendor/pdfium/lib/libpdfium.so" ]; then
+        PDFIUM_RELEASE="${_pdfium_release}" ./scripts/fetch-pdfium.sh
+    fi
+}
+
+build() {
+    cd "$srcdir/${pkgname}-src"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo build --release --bin previewer
+}
+
+package() {
+    cd "$srcdir/${pkgname}-src"
+
+    # Binary.
+    install -Dm755 target/release/previewer \
+        "$pkgdir/usr/bin/previewer"
+
+    # Vendored libpdfium.so under /usr/lib/previewer/ — the binary's
+    # `resolve_pdfium_path` checks here before falling back to the
+    # system loader.
+    install -Dm644 vendor/pdfium/lib/libpdfium.so \
+        "$pkgdir/usr/lib/previewer/libpdfium.so"
+
+    # .desktop entry.
+    install -Dm644 data/org.moma.Previewer.desktop \
+        "$pkgdir/usr/share/applications/org.moma.Previewer.desktop"
+
+    # App icon.
+    install -Dm644 data/icons/hicolor/scalable/apps/org.moma.Previewer.svg \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/org.moma.Previewer.svg"
+
+    # Custom toolbar action icons (pan, shapes, sign, fit-width).
+    install -d "$pkgdir/usr/share/icons/hicolor/scalable/actions"
+    install -Dm644 data/icons/hicolor/scalable/actions/*.svg \
+        -t "$pkgdir/usr/share/icons/hicolor/scalable/actions/"
+
+    # License (Arch convention: under share/licenses/$pkgname).
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

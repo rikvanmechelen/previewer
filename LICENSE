@@ -1,0 +1,13 @@
+Previewer is licensed under the GNU General Public License version 3 or
+(at your option) any later version. The full text of the GPL-3.0 is
+available at https://www.gnu.org/licenses/gpl-3.0.html.
+
+Vendored third-party components, with their own licenses:
+
+* Pdfium (libpdfium.so) — BSD 3-Clause License
+  Copyright (c) Google Inc.
+  https://pdfium.googlesource.com/pdfium/+/main/LICENSE
+
+* Adwaita-style symbolic icons under data/icons/hicolor/scalable/actions/
+  authored by the Previewer maintainers — Creative Commons CC0 1.0
+  Universal (Public Domain Dedication).

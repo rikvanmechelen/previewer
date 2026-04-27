@@ -1,0 +1,78 @@
+[package]
+name = "previewer-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Native GNOME image and PDF viewer with annotation and signing"
+homepage = "https://github.com/rikvanmechelen/previewer"
+
+# `cargo deb` reads this section. Run from the workspace root with:
+#     cargo deb -p previewer-app --no-strip
+# (`--no-strip` lets the workspace `[profile.release]` `strip = "symbols"`
+# do its job — `cargo deb`'s own strip pass is redundant.)
+[package.metadata.deb]
+maintainer = "Previewer maintainers <noreply@moma.org>"
+copyright = "2026, Previewer maintainers"
+license-file = ["../../LICENSE", "0"]
+extended-description = """
+Previewer is a native GNOME desktop application for viewing, annotating,
+and signing images (PNG/JPEG/WebP/HEIC) and PDFs. PDF annotations are
+written as real `/Annot` objects so they remain editable in Acrobat,
+Okular, and macOS Preview.
+"""
+section = "graphics"
+priority = "optional"
+# libgtk-4-1 covers GTK4 runtime; libadwaita-1-0 the libadwaita widgets.
+# `${shlibs:Depends}, ${misc:Depends}` is the canonical Debian way to
+# pull in C library deps automatically.
+depends = "libgtk-4-1 (>= 4.16), libadwaita-1-0 (>= 1.6), libheif1, ${shlibs:Depends}, ${misc:Depends}"
+assets = [
+    ["target/release/previewer", "usr/bin/", "755"],
+    ["../../vendor/pdfium/lib/libpdfium.so", "usr/lib/previewer/libpdfium.so", "644"],
+    ["../../data/org.moma.Previewer.desktop", "usr/share/applications/", "644"],
+    [
+        "../../data/icons/hicolor/scalable/apps/org.moma.Previewer.svg",
+        "usr/share/icons/hicolor/scalable/apps/",
+        "644",
+    ],
+    [
+        "../../data/icons/hicolor/scalable/actions/previewer-pan-symbolic.svg",
+        "usr/share/icons/hicolor/scalable/actions/",
+        "644",
+    ],
+    [
+        "../../data/icons/hicolor/scalable/actions/previewer-shapes-symbolic.svg",
+        "usr/share/icons/hicolor/scalable/actions/",
+        "644",
+    ],
+    [
+        "../../data/icons/hicolor/scalable/actions/previewer-sign-symbolic.svg",
+        "usr/share/icons/hicolor/scalable/actions/",
+        "644",
+    ],
+    [
+        "../../data/icons/hicolor/scalable/actions/previewer-fit-width-symbolic.svg",
+        "usr/share/icons/hicolor/scalable/actions/",
+        "644",
+    ],
+]
+
+[[bin]]
+name = "previewer"
+path = "src/main.rs"
+
+[dependencies]
+previewer-core = { path = "../previewer-core" }
+previewer-image = { path = "../previewer-image", features = ["heic"] }
+previewer-pdf = { path = "../previewer-pdf" }
+previewer-render = { path = "../previewer-render" }
+previewer-signature = { path = "../previewer-signature" }
+
+relm4 = { version = "0.11", features = ["libadwaita", "gnome_50"] }
+gtk = { package = "gtk4", version = "0.11", features = ["gnome_50"] }
+libadwaita = { version = "0.9", features = ["v1_9", "gtk_v4_22"] }
+
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

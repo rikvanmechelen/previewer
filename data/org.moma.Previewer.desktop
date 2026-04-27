@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Previewer
+GenericName=Image and PDF Viewer
+Comment=View, annotate, and sign images and PDFs
+Categories=Graphics;Office;Viewer;
+Icon=org.moma.Previewer
+StartupNotify=true
+StartupWMClass=org.moma.Previewer
+Exec=previewer %F
+Terminal=false
+MimeType=image/png;image/jpeg;image/webp;image/heic;image/heif;application/pdf;

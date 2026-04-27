@@ -1,0 +1,24 @@
+# Build outputs
+/target/
+/vendor/
+
+# Packaging build artefacts (makepkg)
+/packaging/arch/src/
+/packaging/arch/pkg/
+/packaging/arch/previewer-src/
+/packaging/arch/*.pkg.tar.zst
+/packaging/arch/*.log
+
+# Image annotation sidecars are user data, not source
+*.previewer.json
+
+# Editor backups, OS junk
+*.swp
+*.swo
+.DS_Store
+*~
+
+# Belt-and-braces: should never appear here, but ignore in case a
+# bad sync ever brings them across.
+.claude/
+CLAUDE.md

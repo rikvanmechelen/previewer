@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Make `previewer-pdf::resolve_pdfium_path` find the vendored libpdfium
+  # without depending on CARGO_MANIFEST_DIR resolution at runtime.
+  PDFIUM_DYNAMIC_LIB_PATH: ${{ github.workspace }}/vendor/pdfium/lib
+
+jobs:
+  test:
+    name: Build & test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            libheif-dev \
+            libheif-plugin-x265 \
+            xvfb \
+            dbus-x11 \
+            pkg-config \
+            curl \
+            ca-certificates
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Cache the vendored libpdfium across runs — pinned to a specific
+      # `chromium/<NNNN>` release inside the script, so the cache key only
+      # needs to change when we bump that release.
+      - name: Cache pdfium binary
+        id: pdfium-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor/pdfium
+          key: pdfium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/fetch-pdfium.sh') }}
+
+      - name: Fetch pdfium
+        if: steps.pdfium-cache.outputs.cache-hit != 'true'
+        run: ./scripts/fetch-pdfium.sh
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: cargo test (headless)
+        run: xvfb-run -a dbus-run-session -- cargo test --workspace --all-features
+
+      - name: cargo build (release smoke)
+        run: cargo build --workspace --release

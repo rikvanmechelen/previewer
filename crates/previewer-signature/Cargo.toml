@@ -1,0 +1,21 @@
+[package]
+name = "previewer-signature"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+previewer-core = { path = "../previewer-core" }
+image = { workspace = true }
+kurbo = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+pretty_assertions = { workspace = true }
+approx = { workspace = true }
+tempfile = { workspace = true }

@@ -1,0 +1,24 @@
+[package]
+name = "previewer-image"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+default = []
+heic = ["dep:libheif-rs"]
+
+[dependencies]
+previewer-core = { path = "../previewer-core" }
+image = { workspace = true }
+libheif-rs = { version = "2", optional = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+rstest = { workspace = true }
+tempfile = { workspace = true }
+# Test-only: generate HEIC fixtures programmatically so we don't ship binary blobs.
+# This duplicates the optional `libheif-rs` dep but is loaded only for `cargo test`.
+libheif-rs = "2"

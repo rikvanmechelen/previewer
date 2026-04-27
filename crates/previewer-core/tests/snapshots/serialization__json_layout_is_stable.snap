@@ -1,0 +1,115 @@
+---
+source: crates/previewer-core/tests/serialization.rs
+assertion_line: 200
+expression: json
+---
+{
+  "items": [
+    {
+      "type": "rect",
+      "page": 0,
+      "bbox": {
+        "x": 10.0,
+        "y": 20.0,
+        "width": 100.0,
+        "height": 50.0
+      },
+      "stroke": {
+        "color": {
+          "r": 255,
+          "g": 0,
+          "b": 0,
+          "a": 255
+        },
+        "width": 2.0,
+        "style": "solid"
+      },
+      "fill": null
+    },
+    {
+      "type": "ellipse",
+      "page": 0,
+      "bbox": {
+        "x": 50.0,
+        "y": 60.0,
+        "width": 80.0,
+        "height": 80.0
+      },
+      "stroke": {
+        "color": {
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 255
+        },
+        "width": 1.5,
+        "style": "solid"
+      },
+      "fill": {
+        "r": 255,
+        "g": 255,
+        "b": 0,
+        "a": 128
+      }
+    },
+    {
+      "type": "arrow",
+      "page": 0,
+      "from": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "to": {
+        "x": 200.0,
+        "y": 150.0
+      },
+      "stroke": {
+        "color": {
+          "r": 0,
+          "g": 0,
+          "b": 255,
+          "a": 255
+        },
+        "width": 3.0,
+        "style": "solid"
+      },
+      "ends": "end"
+    },
+    {
+      "type": "free_text",
+      "page": 0,
+      "position": {
+        "x": 15.0,
+        "y": 40.0
+      },
+      "text": "hello, world",
+      "font": {
+        "family": "Cantarell",
+        "size": 14.0
+      },
+      "color": {
+        "r": 0,
+        "g": 0,
+        "b": 0,
+        "a": 255
+      },
+      "is_placeholder": false
+    },
+    {
+      "type": "highlight",
+      "page": 0,
+      "bbox": {
+        "x": 5.0,
+        "y": 100.0,
+        "width": 250.0,
+        "height": 18.0
+      },
+      "color": {
+        "r": 255,
+        "g": 255,
+        "b": 0,
+        "a": 96
+      }
+    }
+  ]
+}

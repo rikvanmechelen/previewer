@@ -1,0 +1,15 @@
+[package]
+name = "previewer-render"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+previewer-core = { path = "../previewer-core" }
+cairo-rs = "0.22"
+thiserror = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+approx = { workspace = true }

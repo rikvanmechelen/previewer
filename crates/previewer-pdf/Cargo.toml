@@ -1,0 +1,22 @@
+[package]
+name = "previewer-pdf"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+previewer-core = { path = "../previewer-core" }
+previewer-render = { path = "../previewer-render" }
+pdfium-render = "0.9"
+lopdf = "0.39"
+image = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+pretty_assertions = { workspace = true }
+# pdfium is not safe to call concurrently from multiple threads in our usage
+# (cargo test default). Mark all pdfium-touching tests with `#[serial]`.
+serial_test = "3"

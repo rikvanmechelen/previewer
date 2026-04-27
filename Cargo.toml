@@ -1,0 +1,38 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/previewer-core",
+    "crates/previewer-image",
+    "crates/previewer-render",
+    "crates/previewer-pdf",
+    "crates/previewer-signature",
+    "crates/previewer-app",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.93"
+license = "GPL-3.0-or-later"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+kurbo = "0.11"
+image = "0.25"
+
+proptest = "1"
+insta = { version = "1", features = ["json"] }
+rstest = "0.23"
+pretty_assertions = "1"
+tempfile = "3"
+approx = "0.5"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
