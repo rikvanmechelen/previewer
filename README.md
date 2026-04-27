@@ -76,29 +76,47 @@ and macOS Preview.
 
 ## Install
 
-### Arch Linux
+The fastest path is to grab a pre-built artifact from the
+[Releases page](https://github.com/rikvanmechelen/previewer/releases).
+Each release ships:
+
+- `previewer-app_<version>_amd64.deb` — Debian / Ubuntu install.
+- `Previewer-<version>-x86_64.AppImage` — distro-agnostic, single
+  file, runs anywhere recent (just `chmod +x` and double-click).
+- `SHA256SUMS` — verify with `sha256sum -c SHA256SUMS`.
+
+### AppImage (any distro)
+
+```sh
+curl -LO https://github.com/rikvanmechelen/previewer/releases/latest/download/Previewer-x86_64.AppImage
+chmod +x Previewer-x86_64.AppImage
+./Previewer-x86_64.AppImage ~/Documents/contract.pdf
+```
+
+If your distro doesn't have `libfuse2`, run with
+`./Previewer-x86_64.AppImage --appimage-extract-and-run` instead.
+
+### Debian / Ubuntu (.deb)
+
+```sh
+curl -LO https://github.com/rikvanmechelen/previewer/releases/latest/download/previewer-app_amd64.deb
+sudo apt install ./previewer-app_amd64.deb
+```
+
+Runtime dependencies declared in the package: `libgtk-4-1 (>= 4.16)`,
+`libadwaita-1-0 (>= 1.6)`, `libheif1`. `apt install` resolves them
+from your package mirror.
+
+### Arch Linux (PKGBUILD)
 
 ```sh
 cd packaging/arch
 makepkg -si
 ```
 
-The PKGBUILD copies the worktree (or, for tagged releases, downloads
-a release tarball) into the build sandbox, fetches the pinned
-`libpdfium.so` via `scripts/fetch-pdfium.sh`, then builds and installs
-to `/usr/bin/previewer` plus the standard XDG locations.
-
-### Debian / Ubuntu
-
-```sh
-cargo install cargo-deb
-./scripts/fetch-pdfium.sh
-cargo deb -p previewer-app --no-strip
-sudo dpkg -i target/debian/previewer-app_*.deb
-```
-
-Runtime dependencies declared in the package: `libgtk-4-1 (>= 4.16)`,
-`libadwaita-1-0 (>= 1.6)`, `libheif1`.
+The PKGBUILD copies the worktree into the build sandbox, fetches the
+pinned `libpdfium.so` via `scripts/fetch-pdfium.sh`, then builds and
+installs to `/usr/bin/previewer` plus the standard XDG locations.
 
 ### Build from source (any distro)
 

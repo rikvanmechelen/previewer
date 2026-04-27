@@ -2,6 +2,29 @@
 
 Build distribution-ready packages for Previewer.
 
+## Automated releases (recommended)
+
+The `release.yml` GitHub Actions workflow at
+`.github/workflows/release.yml` builds **both a `.deb` and a
+distro-agnostic AppImage** on every `vX.Y.Z` tag push and uploads them
+to a GitHub Release.
+
+```sh
+# Bump version in the workspace Cargo.toml, then:
+git tag v0.1.0
+git push --tags
+# Watch the workflow at https://github.com/<owner>/previewer/actions.
+# When green, the Release page lists the .deb, the AppImage, and a
+# SHA256SUMS file.
+```
+
+The workflow also has a manual `workflow_dispatch` trigger so a
+maintainer can re-run a build for an existing tag without deleting
+and re-pushing.
+
+The sections below cover **local** builds — useful for testing a PR
+or smoke-testing the packaging changes before tagging.
+
 Both flavours bundle the vendored `libpdfium.so` to
 `/usr/lib/previewer/libpdfium.so` and rely on the `resolve_pdfium_path`
 fallback in `crates/previewer-pdf/src/lib.rs` to locate it at runtime —

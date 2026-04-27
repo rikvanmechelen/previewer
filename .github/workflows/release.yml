@@ -1,0 +1,159 @@
+name: Release
+
+# Builds a .deb and a distro-agnostic AppImage on every `vX.Y.Z` tag
+# push and uploads them to the GitHub Release that the tag implicitly
+# creates.
+#
+# Usage:
+#   1. Bump `version` in workspace `Cargo.toml`.
+#   2. `git tag v0.1.0 && git push --tags`.
+#   3. Watch the workflow run; the Release will appear with assets
+#      attached at https://github.com/<owner>/previewer/releases.
+
+on:
+  push:
+    tags: ['v*.*.*']
+  # Manual fallback so a maintainer can re-run a build for an existing
+  # tag (e.g. after fixing CI) without having to delete and re-push.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v0.1.0)"
+        required: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  PDFIUM_DYNAMIC_LIB_PATH: ${{ github.workspace }}/vendor/pdfium/lib
+  # AppImage tooling on ubuntu-24.04 doesn't have libfuse2 by default,
+  # which the AppImage runtime needs to mount itself. Fall back to
+  # extract-and-run so linuxdeploy still functions.
+  APPIMAGE_EXTRACT_AND_RUN: "1"
+
+jobs:
+  build:
+    name: Build .deb + AppImage
+    runs-on: ubuntu-24.04
+    permissions:
+      # `softprops/action-gh-release` needs write to upload assets.
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            libheif-dev \
+            libheif-plugin-x265 \
+            pkg-config \
+            curl \
+            ca-certificates \
+            file \
+            desktop-file-utils \
+            librsvg2-dev \
+            zsync
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Cache pdfium binary
+        id: pdfium-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor/pdfium
+          key: pdfium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/fetch-pdfium.sh') }}
+
+      - name: Fetch pdfium
+        if: steps.pdfium-cache.outputs.cache-hit != 'true'
+        run: ./scripts/fetch-pdfium.sh
+
+      - name: Build release binary
+        run: cargo build --workspace --release
+
+      # ──────────────────────── .deb ────────────────────────
+      - name: Install cargo-deb
+        run: cargo install cargo-deb --locked
+
+      - name: Build .deb
+        # `--no-strip` lets the workspace's profile.release `strip =
+        # "symbols"` do the work without a redundant pass.
+        run: cargo deb -p previewer-app --no-strip --no-build
+
+      # ────────────────────── AppImage ──────────────────────
+      - name: Stage AppDir
+        run: |
+          set -eux
+          APPDIR="$PWD/AppDir"
+          rm -rf "$APPDIR"
+          mkdir -p "$APPDIR/usr/bin"
+          mkdir -p "$APPDIR/usr/lib"
+          mkdir -p "$APPDIR/usr/share/applications"
+          mkdir -p "$APPDIR/usr/share/icons/hicolor/scalable/apps"
+          mkdir -p "$APPDIR/usr/share/icons/hicolor/scalable/actions"
+
+          install -Dm755 target/release/previewer "$APPDIR/usr/bin/previewer"
+
+          # Place libpdfium.so directly under usr/lib/ so linuxdeploy's
+          # default LD_LIBRARY_PATH ($APPDIR/usr/lib) catches it via the
+          # bare-name fallback in `resolve_pdfium_path`. No env-var
+          # gymnastics needed at runtime.
+          install -Dm644 vendor/pdfium/lib/libpdfium.so "$APPDIR/usr/lib/libpdfium.so"
+
+          install -Dm644 data/org.moma.Previewer.desktop \
+            "$APPDIR/usr/share/applications/org.moma.Previewer.desktop"
+          install -Dm644 data/icons/hicolor/scalable/apps/org.moma.Previewer.svg \
+            "$APPDIR/usr/share/icons/hicolor/scalable/apps/org.moma.Previewer.svg"
+          for svg in data/icons/hicolor/scalable/actions/*.svg; do
+            install -Dm644 "$svg" "$APPDIR/usr/share/icons/hicolor/scalable/actions/$(basename "$svg")"
+          done
+
+      - name: Fetch linuxdeploy + GTK plugin
+        run: |
+          curl -L -o linuxdeploy-x86_64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          curl -L -o linuxdeploy-plugin-gtk.sh \
+            https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk.sh
+
+      - name: Build AppImage
+        env:
+          # Surfaces in the AppImage filename: Previewer-<VERSION>-x86_64.AppImage.
+          VERSION: ${{ github.event.inputs.tag || github.ref_name }}
+          DEPLOY_GTK_VERSION: "4"
+        run: |
+          set -eux
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --plugin gtk \
+            --desktop-file AppDir/usr/share/applications/org.moma.Previewer.desktop \
+            --icon-file data/icons/hicolor/scalable/apps/org.moma.Previewer.svg \
+            --output appimage
+          ls -la *.AppImage
+
+      # ────────────────── Collect & checksum ────────────────
+      - name: Collect artifacts + checksums
+        run: |
+          set -eux
+          mkdir -p dist
+          cp target/debian/*.deb dist/
+          cp *.AppImage dist/
+          (cd dist && sha256sum * > SHA256SUMS)
+          ls -la dist
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: |
+            dist/*.deb
+            dist/*.AppImage
+            dist/SHA256SUMS
+          generate_release_notes: true
+          fail_on_unmatched_files: true
