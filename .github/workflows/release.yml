@@ -128,38 +128,47 @@ jobs:
             install -Dm644 "$svg" "$APPDIR/usr/share/icons/hicolor/scalable/actions/$(basename "$svg")"
           done
 
-      - name: Fetch linuxdeploy + GTK plugin
+      - name: Fetch linuxdeploy
         run: |
           curl -L -o linuxdeploy-x86_64.AppImage \
             https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          curl -L -o linuxdeploy-plugin-gtk.sh \
-            https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
-          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk.sh
+          chmod +x linuxdeploy-x86_64.AppImage
 
-      - name: Defensive — ensure GTK plugin's expected dirs exist + log paths
-        # linuxdeploy-plugin-gtk derives a bunch of paths via pkg-config
-        # variables and `cp -r`s the resulting dirs. Any missing source
-        # is a hard fail. Pre-create the most fragile ones empty (they
-        # won't break the resulting AppImage at runtime — GTK4 doesn't
-        # require the legacy modules dir, and the gdk-pixbuf loaders
-        # cache file won't exist either way) and dump the resolved
-        # paths so future failures are easier to diagnose.
+      - name: Bundle gdk-pixbuf loaders manually
+        # We dropped linuxdeploy-plugin-gtk because it was fragile against
+        # modern Arch (kept hard-failing on missing /usr/lib/gtk-4.0,
+        # then on empty pkg-config variables for gdk-pixbuf2). Manually
+        # copy the bits we actually need: the SVG/PNG pixbuf loaders so
+        # GTK can decode our action icons at runtime, plus the
+        # Adwaita icon theme. Anything else (gschemas, GIR typelibs,
+        # gtk-4.0 modules) Previewer doesn't use.
         run: |
-          set -x
-          mkdir -p /usr/lib/gtk-4.0
-          mkdir -p AppDir/usr/lib/gtk-4.0
-          # gdk-pixbuf-2.0 loaders dir lives at /usr/lib/gdk-pixbuf-2.0/2.10.0
-          # on Arch; the plugin reads its location from pkg-config.
-          for var in gdk_pixbuf_binary_version gdk_pixbuf_binarydir gdk_pixbuf_moduledir; do
-              echo "$var=$(pkg-config --variable=$var gdk-pixbuf-2.0 2>&1)"
-          done
-          ls -la /usr/lib/gdk-pixbuf-2.0 2>&1 || true
-          ls -la /usr/lib/gtk-4.0 2>&1 || true
+          set -eux
+          # gdk-pixbuf loader dir + loaders.cache. Use pkg-config in
+          # case the version path moves; resolve at build time.
+          PIXBUF_DIR="$(pkg-config --variable=gdk_pixbuf_binarydir gdk-pixbuf-2.0)"
+          if [ -n "$PIXBUF_DIR" ] && [ -d "$PIXBUF_DIR" ]; then
+              mkdir -p "AppDir$PIXBUF_DIR"
+              cp -r "$PIXBUF_DIR"/* "AppDir$PIXBUF_DIR/" || true
+              # Regenerate the cache file relative to the AppDir so the
+              # AppImage finds its bundled loaders.
+              GDK_PIXBUF_MODULEDIR="$PIXBUF_DIR/loaders" \
+                gdk-pixbuf-query-loaders > "AppDir$PIXBUF_DIR/loaders.cache" || true
+          fi
+          # Adwaita icon theme — small enough to bundle, makes the
+          # AppImage self-contained on hosts without it installed.
+          if [ -d /usr/share/icons/Adwaita ]; then
+              mkdir -p AppDir/usr/share/icons
+              cp -r /usr/share/icons/Adwaita AppDir/usr/share/icons/
+          fi
+          if [ -d /usr/share/icons/hicolor ]; then
+              mkdir -p AppDir/usr/share/icons
+              cp -r /usr/share/icons/hicolor AppDir/usr/share/icons/ 2>/dev/null || true
+          fi
 
       - name: Build AppImage
         env:
           VERSION: ${{ github.event.inputs.tag || github.ref_name }}
-          DEPLOY_GTK_VERSION: "4"
           # linuxdeploy ships an older `strip` that doesn't understand
           # the SHT_RELR (`.relr.dyn`) ELF section the bundled Arch
           # libraries use. Skip stripping entirely — the AppImage is
@@ -167,9 +176,12 @@ jobs:
           NO_STRIP: "true"
         run: |
           set -eux
+          # No --plugin gtk — see the manual gdk-pixbuf bundling step
+          # above. linuxdeploy alone bundles libgtk-4.so.1, libadwaita
+          # and their NEEDED transitive deps from /usr/lib, which is
+          # what we actually want.
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
-            --plugin gtk \
             --desktop-file AppDir/usr/share/applications/org.moma.Previewer.desktop \
             --icon-file data/icons/hicolor/scalable/apps/org.moma.Previewer.svg \
             --output appimage
