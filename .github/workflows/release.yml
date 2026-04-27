@@ -129,6 +129,20 @@ jobs:
             https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk.sh
 
+      - name: Defensive — ensure gtk-4.0 module dir exists
+        # linuxdeploy-plugin-gtk hard-fails when /usr/lib/gtk-4.0
+        # doesn't exist (it `cp -r`s the dir). On modern Arch the
+        # gtk4 package may not install this dir if no print backends
+        # are configured. Create it empty so the plugin's copy step
+        # is a no-op rather than an error. GTK4 itself doesn't need
+        # the modules dir at runtime — it's a legacy GTK3 feature.
+        run: |
+          ls -la /usr/lib/gtk-4.0 2>&1 || echo "(gtk-4.0 dir absent — creating)"
+          mkdir -p /usr/lib/gtk-4.0
+          # Also pre-create the AppDir destination linuxdeploy-plugin-gtk
+          # writes into, on the off chance the cp is failing on dest.
+          mkdir -p AppDir/usr/lib/gtk-4.0
+
       - name: Build AppImage
         env:
           VERSION: ${{ github.event.inputs.tag || github.ref_name }}
